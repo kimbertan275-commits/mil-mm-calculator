@@ -1,0 +1,187 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>mil / mm 换算器</title>
+  <style>
+    * { box-sizing: border-box; }
+    :root { color-scheme: light; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; color: #1e293b; background: #f3f6fb; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 24px; }
+    main { width: min(100%, 620px); padding: 32px; background: white; border: 1px solid #e3e9f2; border-radius: 24px; box-shadow: 0 16px 55px #172b4d0c; }
+    h1 { font-size: 28px; letter-spacing: -.5px; margin: 0 0 8px; }
+    .subtitle { color: #64748b; font-size: 14px; margin: 0 0 26px; }
+    .fields { display: grid; gap: 16px; }
+    .field { padding: 18px; border: 1px solid #dfe7f3; border-radius: 14px; background: #f9fbff; }
+    .field:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px #2563eb12; }
+    label { display: block; font-weight: 600; margin-bottom: 12px; }
+    label span { font-weight: 400; font-size: 13px; color: #64748b; margin-left: 8px; }
+    .entry { display: flex; align-items: center; gap: 12px; }
+    input { width: 100%; min-width: 0; padding: 0; border: 0; outline: none; background: transparent; color: #172b4d; font: 32px "Segoe UI", sans-serif; font-variant-numeric: tabular-nums; }
+    input::placeholder { color: #b2bfd2; }
+    input[aria-invalid="true"] { color: #b42318; }
+    button, select { font: inherit; }
+    button { border: 1px solid #dce5f1; border-radius: 8px; background: white; color: #334155; padding: 8px 13px; cursor: pointer; white-space: nowrap; }
+    button:hover { background: #edf3ff; border-color: #aac5ff; }
+    button:focus-visible, select:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+    button:disabled { opacity: .4; cursor: default; }
+    .copy { color: #2563eb; background: #eaf1ff; border-color: transparent; font-size: 14px; }
+    #status { min-height: 40px; margin: 12px 0 6px; color: #64748b; font-size: 13px; overflow-wrap: anywhere; }
+    #status.error { color: #b42318; }
+    .options { display: flex; align-items: center; justify-content: space-between; gap: 14px; font-size: 13px; color: #64748b; }
+    .options label { display: flex; align-items: center; gap: 8px; margin: 0; font-weight: 400; }
+    select { padding: 7px 10px; border: 1px solid #dce5f1; border-radius: 8px; background: white; color: #334155; }
+    .presets { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 22px; }
+    .presets button { font-size: 13px; padding: 6px 11px; }
+    footer { border-top: 1px solid #edf1f6; margin-top: 24px; padding-top: 18px; text-align: center; color: #64748b; font-size: 12px; line-height: 1.8; }
+    @media (max-width: 450px) { body { padding: 12px; } main { padding: 22px 18px; border-radius: 18px; } h1 { font-size: 24px; } input { font-size: 27px; } .field { padding: 14px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>mil / mm 换算器</h1>
+    <p class="subtitle">输入任意一侧，实时双向换算。</p>
+    <div class="fields">
+      <div class="field">
+        <label for="mil">mil <span>千分之一英寸</span></label>
+        <div class="entry">
+          <input id="mil" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="输入 mil" aria-describedby="status" value="10">
+          <button class="copy" id="copyMil" type="button" aria-label="复制 mil 数值">复制</button>
+        </div>
+      </div>
+      <div class="field">
+        <label for="mm">mm <span>毫米</span></label>
+        <div class="entry">
+          <input id="mm" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="输入 mm" aria-describedby="status">
+          <button class="copy" id="copyMm" type="button" aria-label="复制 mm 数值">复制</button>
+        </div>
+      </div>
+    </div>
+    <p id="status" role="status" aria-live="polite"></p>
+    <div class="options">
+      <label for="digits">结果小数位
+        <select id="digits">
+          <option>2</option><option>4</option><option selected>6</option><option>8</option><option>10</option>
+        </select>
+      </label>
+      <button id="clear" type="button">清空</button>
+    </div>
+    <div class="presets" aria-label="常用尺寸">
+      <button type="button" data-unit="mil" data-value="10">10 mil</button>
+      <button type="button" data-unit="mil" data-value="20">20 mil</button>
+      <button type="button" data-unit="mil" data-value="50">50 mil</button>
+      <button type="button" data-unit="mil" data-value="100">100 mil</button>
+      <button type="button" data-unit="mm" data-value="1">1 mm</button>
+      <button type="button" data-unit="mm" data-value="2.54">2.54 mm</button>
+    </div>
+    <footer>1 mil = 0.0254 mm · 1 mm ≈ 39.370079 mil<br>离线使用 · 复制不带单位 · 结果按所选位数舍入</footer>
+  </main>
+  <script>
+    'use strict';
+    const factor = 0.0254;
+    const mil = document.getElementById('mil');
+    const mm = document.getElementById('mm');
+    const digits = document.getElementById('digits');
+    const status = document.getElementById('status');
+    const copyMil = document.getElementById('copyMil');
+    const copyMm = document.getElementById('copyMm');
+    let sourceUnit = 'mil';
+    let valid = false;
+
+    function parseNumber(text) {
+      const trimmed = text.trim();
+      if (!/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(trimmed)) return null;
+      const number = Number(trimmed);
+      if (!Number.isFinite(number)) return null;
+      // Do not silently accept an underflowed nonzero input as zero.
+      if (number === 0 && /[1-9]/.test(trimmed.split(/[eE]/)[0])) return null;
+      return number;
+    }
+
+    function formatNumber(number, places) {
+      if (number === 0) return '0';
+      if (Math.abs(number) >= 1e21) return number.toExponential(10);
+      const fixed = number.toFixed(places);
+      if (Number(fixed) === 0) return number.toExponential(10);
+      return fixed.replace(/(\.\d*?[1-9])0+$|\.0+$/, '$1');
+    }
+
+    function setStatus(text, error = false) {
+      status.textContent = text;
+      status.classList.toggle('error', error);
+    }
+
+    function convert(unit = sourceUnit) {
+      sourceUnit = unit;
+      const source = unit === 'mil' ? mil : mm;
+      const target = unit === 'mil' ? mm : mil;
+      const targetUnit = unit === 'mil' ? 'mm' : 'mil';
+      const text = source.value.trim();
+      const number = parseNumber(text);
+      const result = number === null ? null : (unit === 'mil' ? number * factor : number / factor);
+      valid = result !== null && Number.isFinite(result) && (number === 0 || result !== 0);
+      mil.removeAttribute('aria-invalid');
+      mm.removeAttribute('aria-invalid');
+      if (!text) {
+        target.value = '';
+        setStatus('在任意一侧输入数值。');
+      } else if (!valid) {
+        target.value = '';
+        source.setAttribute('aria-invalid', 'true');
+        setStatus('请输入有效数字（小数点用 .），或数值超出范围。', true);
+      } else {
+        target.value = formatNumber(result, Number(digits.value));
+        const symbol = Number(target.value) === result ? ' = ' : ' ≈ ';
+        setStatus(text + ' ' + unit + symbol + target.value + ' ' + targetUnit);
+      }
+      copyMil.disabled = copyMm.disabled = !valid;
+    }
+
+    async function copyValue(input, unit) {
+      if (!valid) return;
+      const text = input.value.trim();
+      try {
+        if (navigator.clipboard && window.isSecureContext) {
+          await navigator.clipboard.writeText(text);
+        } else {
+          const previousFocus = document.activeElement;
+          const start = input.selectionStart;
+          const end = input.selectionEnd;
+          input.focus();
+          input.select();
+          const copied = document.execCommand('copy');
+          input.setSelectionRange(start, end);
+          if (previousFocus) previousFocus.focus();
+          if (!copied) throw new Error('Clipboard unavailable');
+        }
+        setStatus('已复制 ' + unit + ' 数值。');
+      } catch {
+        input.focus();
+        input.select();
+        setStatus('浏览器未允许自动复制，按 Ctrl+C 即可。');
+      }
+    }
+
+    mil.addEventListener('input', () => convert('mil'));
+    mm.addEventListener('input', () => convert('mm'));
+    digits.addEventListener('change', () => convert());
+    copyMil.addEventListener('click', () => copyValue(mil, 'mil'));
+    copyMm.addEventListener('click', () => copyValue(mm, 'mm'));
+    document.getElementById('clear').addEventListener('click', () => {
+      mil.value = mm.value = '';
+      convert('mil');
+      mil.focus();
+    });
+    document.querySelectorAll('[data-unit]').forEach(button => {
+      button.addEventListener('click', () => {
+        const input = button.dataset.unit === 'mil' ? mil : mm;
+        input.value = button.dataset.value;
+        convert(button.dataset.unit);
+        input.focus();
+        input.select();
+      });
+    });
+    convert();
+  </script>
+</body>
+</html>
